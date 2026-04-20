@@ -1,0 +1,10 @@
+{
+  "name": "securecheck",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Scripts used by the SecureCheck reusable security-scan GitHub workflow.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.37.0"
+  }
+}

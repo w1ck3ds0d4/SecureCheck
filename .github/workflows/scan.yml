@@ -1,0 +1,142 @@
+name: Security Scan
+
+on:
+  workflow_call:
+    inputs:
+      node_version:
+        type: string
+        default: '20'
+      python_version:
+        type: string
+        default: '3.11'
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.24.3
+    steps:
+      - name: Checkout consumer repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Checkout SecureCheck
+        uses: actions/checkout@v6
+        with:
+          repository: w1ck3ds0d4/SecureCheck
+          path: .securecheck
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz -C /tmp
+          sudo mv /tmp/gitleaks /usr/local/bin/
+
+      - name: Run gitleaks
+        id: gitleaks
+        run: |
+          gitleaks detect --source . --redact --no-banner --report-format json --report-path /tmp/gitleaks.json --exit-code 0 || true
+          COUNT=$(jq 'length' /tmp/gitleaks.json 2>/dev/null || echo 0)
+          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "Gitleaks findings: ${COUNT}"
+
+      - name: Install and run Semgrep
+        id: semgrep
+        run: |
+          python -m pip install --quiet semgrep
+          semgrep --config=auto --json --output=/tmp/semgrep.json --quiet . || true
+          COUNT=$(jq '.results | length' /tmp/semgrep.json 2>/dev/null || echo 0)
+          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "Semgrep findings: ${COUNT}"
+
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          scan-type: fs
+          format: json
+          output: /tmp/trivy.json
+          exit-code: '0'
+          scanners: vuln,misconfig
+          ignore-unfixed: false
+
+      - name: Count Trivy findings
+        id: trivy
+        run: |
+          COUNT=$(jq '[.Results[]?.Vulnerabilities // [], .Results[]?.Misconfigurations // [] | length] | add // 0' /tmp/trivy.json 2>/dev/null || echo 0)
+          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "Trivy findings: ${COUNT}"
+
+      - name: Claude review (optional)
+        id: claude
+        if: github.event_name == 'pull_request'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "ANTHROPIC_API_KEY not set; skipping Claude review"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          cd .securecheck
+          npm install --silent --no-audit --no-fund
+          cd ..
+          node .securecheck/scripts/claude-review.mjs > /tmp/claude.json
+          COUNT=$(jq 'length' /tmp/claude.json 2>/dev/null || echo 0)
+          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "Claude findings: ${COUNT}"
+
+      - name: Post to Discord
+        if: always()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GITLEAKS_COUNT: ${{ steps.gitleaks.outputs.count }}
+          SEMGREP_COUNT: ${{ steps.semgrep.outputs.count }}
+          TRIVY_COUNT: ${{ steps.trivy.outputs.count }}
+          CLAUDE_COUNT: ${{ steps.claude.outputs.count }}
+          CLAUDE_ENABLED: ${{ steps.claude.outputs.enabled }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
+            echo "DISCORD_WEBHOOK_URL not set; skipping notification"
+            exit 0
+          fi
+          node .securecheck/scripts/notify.mjs
+
+      - name: Upload raw reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            /tmp/gitleaks.json
+            /tmp/semgrep.json
+            /tmp/trivy.json
+            /tmp/claude.json
+          if-no-files-found: ignore
+          retention-days: 14
