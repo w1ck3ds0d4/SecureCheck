@@ -82,6 +82,52 @@ jobs:
           echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
           echo "Trivy findings: ${COUNT}"
 
+      - name: Style check (no em-dashes introduced)
+        id: em_dash
+        run: |
+          set -euo pipefail
+          # Determine diff range: PR base..HEAD, or last push commit
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1 || true
+            BASE_SHA=$(git merge-base "origin/${{ github.base_ref }}" HEAD 2>/dev/null || echo "")
+            if [ -z "${BASE_SHA}" ]; then
+              echo "Could not compute merge-base; skipping check"
+              echo "count=0" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            RANGE="${BASE_SHA}..HEAD"
+          else
+            # On push: compare against parent commit
+            if git rev-parse HEAD^ >/dev/null 2>&1; then
+              RANGE="HEAD^..HEAD"
+            else
+              # Initial commit - no parent to diff against
+              echo "Initial commit; skipping check"
+              echo "count=0" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          # Newly-added em-dashes (U+2014) in changed content, excluding common third-party paths
+          MATCHES=$(git diff "${RANGE}" -- \
+            ':!*.lock' ':!*.svg' ':!node_modules/**' ':!dist/**' ':!build/**' \
+            ':!wwwroot/lib/**' ':!.vendor/**' ':!vendor/**' ':!*.min.js' ':!*.min.css' \
+            | grep -E '^\+[^+]' | grep -F "—" || true)
+
+          if [ -n "${MATCHES}" ]; then
+            COUNT=$(echo "${MATCHES}" | wc -l | tr -d ' ')
+            echo "FAIL: ${COUNT} em-dash(es) introduced in this change set"
+            echo "Per style rule, U+2014 EM DASH is forbidden anywhere in new content."
+            echo "Replace with U+002D HYPHEN ('-') or restructure the sentence."
+            echo
+            echo "--- Sample of offending added lines: ---"
+            echo "${MATCHES}" | head -10
+            echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "OK: no em-dashes introduced"
+          echo "count=0" >> "$GITHUB_OUTPUT"
+
       - name: Claude review (optional)
         id: claude
         if: github.event_name == 'pull_request'
