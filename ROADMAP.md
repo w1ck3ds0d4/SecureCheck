@@ -1,65 +1,93 @@
-# Roadmap
+# SecureCheck v1 Roadmap
 
-SecureCheck is small on purpose. The roadmap focuses on closing gaps between the documented behaviour, the actual workflow, and the scanners' capabilities. No timeline is committed; items are listed in rough priority order.
+## What v1 is
 
-## Known gaps
+A reusable GitHub Actions workflow that consumer repos call from their own
+`security.yml`. Runs gitleaks (secrets in history), Semgrep (SAST with
+`auto` ruleset), Trivy (CVE + IaC), and an optional Claude Sonnet code review
+on PRs. Posts a severity-coloured Discord embed and uploads raw scanner
+output as artifacts.
 
-### Silent-on-clean-push is not enforced
+## Current state
 
-`README.md` states "Silent on clean pushes, no Discord noise for green main commits." The current `scripts/notify.mjs` posts an embed on every run when `DISCORD_WEBHOOK_URL` is set, regardless of `EVENT_NAME` or total findings. The expected behaviour can be implemented either in:
+Workflow is in production and consumed by DA-Task-Alert, RS3-Companion,
+GlassVault, GlassVault.tools, and others. Gitleaks 8.24.3, Semgrep `auto`,
+Trivy, Claude Sonnet step (gated on `ANTHROPIC_API_KEY`). Discord severity
+coding (green clean / yellow findings / orange many findings / red gitleaks
+hit). Per-scanner JSON artifacts retained 14 days. PR heartbeat posts even
+when green. Silent on clean pushes to main.
 
-- `notify.mjs` (early `process.exit(0)` when `total === 0 && EVENT_NAME !== 'pull_request'`), or
-- `.github/workflows/scan.yml` (gate the Post step on `event_name == 'pull_request' || total > 0`).
+## v1 acceptance criteria
 
-The script-level option keeps the workflow file simpler and is the smaller change.
+- [x] gitleaks scanner with current pinned version
+- [x] Semgrep `auto` ruleset
+- [x] Trivy CVE + IaC scan
+- [x] Optional Claude Sonnet PR review
+- [x] Discord severity coding
+- [x] Per-scanner JSON artifact upload (14-day retention)
+- [x] PR heartbeat posts on green PRs
+- [x] Silent on clean main pushes
+- [x] Em-dash style check gate
+- [x] Gitleaks fails on intro
+- [ ] Documented input matrix (every input the workflow accepts + default + meaning)
+- [ ] Documented secret matrix (every secret the workflow expects + where it's used)
+- [ ] Consumer install template (`.github/workflows/security.yml` example with placeholders)
+- [ ] Version pinning policy + changelog
+- [ ] Smoke test consumer: a `tests/consumer-fixture` repo or scratch run validating each scanner produces output as expected
+- [ ] Tag `v1.0.0` once the input + secret matrices and consumer template are in tree
 
-### Pinning and supply-chain hardening
+## Milestones to v1
 
-The reusable workflow uses major-version float on third-party actions:
+### M1. Input + secret matrix (S)
 
-- `actions/checkout@v6`
-- `actions/setup-node@v6`
-- `actions/setup-python@v6`
-- `aquasecurity/trivy-action@0.35.0` (already pinned)
-- `actions/upload-artifact@v4`
+- [ ] Document every `workflow_call` input in README (name, type, default, meaning)
+- [ ] Document every secret expected (`DISCORD_WEBHOOK_URL`, `ANTHROPIC_API_KEY`, `GITHUB_TOKEN` scopes)
+- [ ] Note which inputs / secrets are optional vs required
 
-Floating to `@v6` is convenient but exposes the pipeline to upstream tag movement. A future hardening pass should pin to commit SHAs and document an upgrade procedure.
+**Acceptance:** a consumer can wire the workflow without reading the YAML.
 
-`@anthropic-ai/sdk` is declared with caret range `^0.37.0` in `package.json` and installed at runtime via `npm install` inside the workflow. There is no `package-lock.json` committed, so the resolved version is not reproducible.
+### M2. Consumer install template (S)
 
-### Action versions
+- [ ] Add `examples/security.yml` showing the minimal caller
+- [ ] Add `examples/security-with-claude.yml` showing the Claude variant
+- [ ] Link both from README
 
-- `aquasecurity/trivy-action@0.35.0` is older than the current available release. Bump and re-test.
-- `gitleaks` version is hard-coded as `8.24.3` in the workflow env. Track a periodic bump.
+**Acceptance:** copy-paste from `examples/` gets a new consumer to green in 5 minutes.
 
-## Near-term improvements
+### M3. Versioning + changelog (S)
 
-- Add a `package-lock.json` so the Claude step installs deterministically, then switch the install step to `npm ci`.
-- Pin GitHub-hosted actions to commit SHAs.
-- Add a `severity_threshold` input that lets a consumer fail the run when, for example, gitleaks count > 0 or total findings exceed N. Currently the workflow never fails on findings.
-- Cache the Semgrep ruleset between runs to cut cold-start time.
-- Add a smoke test workflow inside this repo that runs `scan.yml` against itself on PR.
+- [ ] Add CHANGELOG.md
+- [ ] Document version pinning policy: consumers reference `@v1` for stable, `@main` for latest
+- [ ] Tag policy: `v1.0.0`, `v1.0.1` for patches, `v1.1.0` for additive features, `v2.0.0` for breaking changes
 
-## Medium-term ideas
+**Acceptance:** consumers know exactly which tag to pin and what they get.
 
-- Optional SARIF upload so findings show up in the consumer repo's GitHub Security tab in addition to Discord.
-- Per-scanner enable flags as workflow inputs (some consumers do not want Trivy IaC scans, for example).
-- Allow the Claude reviewer to accept a custom system prompt via input, so consumer repos can tune it without forking SecureCheck.
-- Slack notifier as a sibling to `notify.mjs`, selected via a `notifier` input.
-- Configurable retention days for the artifact (currently fixed at 14).
+### M4. Smoke fixture (S/M)
 
-## Long-term ideas
+- [ ] A `tests/consumer-fixture/` scratch dir with intentional leaks / SAST hits / Trivy CVEs
+- [ ] CI on the SecureCheck repo runs the workflow against the fixture and asserts expected severities
+- [ ] Document how to run it locally with `act` (or note that it requires GitHub Actions)
 
-- Historical finding store. A small JSON ledger written to a separate branch or to a Gist, so the embed can show "5 new, 2 fixed since last scan" instead of just totals.
-- Optional Anthropic-managed agent invocation so the reviewer can read multiple files, not just the diff. Cost gating would be required.
+**Acceptance:** changes to the workflow can't ship without proving all scanners still fire.
 
-## Out of scope
+### M5. Tag v1.0.0 (S)
 
-- Hosted SaaS, a web UI, or a dashboard. SecureCheck is intentionally a thin reusable workflow.
-- Replacing any of the three primary scanners. Adding more is fine; the three current ones stay.
-- Bundling the Node scripts as a published GitHub Action under `action.yml`. The `workflow_call` model is preferred because it gives consumers full visibility into every step.
+- [ ] README polish
+- [ ] Tag `v1.0.0`
+- [ ] Update consumer repos one-by-one to pin `@v1.0.0`
 
-## Open questions
+**Acceptance:** at least 5 consumer repos pin the v1.0.0 tag.
 
-- Should the optional Claude review run on push as well, gated by some heuristic, or stay PR-only? Currently PR-only saves API spend but loses signal on direct pushes to `main`.
-- Is the 40,000-character diff truncation the right cap? Larger diffs silently drop content.
+## Beyond v1 (post-1.0 polish)
+
+- Additional scanners (e.g., `osv-scanner`, `kubesec` for k8s manifests)
+- Slack / Teams channel posters alongside Discord
+- Markdown PR comment with findings (alongside Discord embed)
+- Severity threshold gating ("fail PR if critical findings")
+- Re-run knob to refresh stale Trivy DB without bumping the workflow version
+
+## Out of scope for v1
+
+- Hosting a SaaS edition (it's a GitHub-native workflow)
+- Replacing any of the underlying scanners (they're best-of-class for the niche)
+- Container image building / publishing (consumer's responsibility)
