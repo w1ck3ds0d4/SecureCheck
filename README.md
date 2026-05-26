@@ -9,12 +9,16 @@ Reusable GitHub Actions workflow that runs a multi-scanner security pipeline on 
 - **Centralised scanner stack** - scanners and rules live in one repo; each consumer repo contains a thin caller, so updates propagate without touching every project
 - **Gitleaks** - hardcoded secrets in the working tree and history, on every push and PR
 - **Semgrep** - pattern-based SAST using the curated `auto` ruleset
-- **Trivy** - dependency CVEs and IaC / configuration misconfigurations
-- **Optional Claude review** - Claude Sonnet 4.6 reviews the PR diff for logic issues scanners miss; gated on `ANTHROPIC_API_KEY` and skipped silently when the secret is not set
-- **Single Discord embed per run** - severity colouring, per-scanner counts, direct links to the workflow run and pull request
+- **Trivy** - dependency CVEs, IaC / configuration misconfigurations, **plus license findings** (vuln / misconfig / license counts surface separately)
+- **Per-language quality linters (auto-detected)** - ESLint (JS/TS, when an eslint config exists), ruff lint + format check (Python), `cargo fmt --check` + `cargo clippy -D warnings` (Rust), `dotnet format --verify-no-changes` (.NET). Skipped silently when the language isn't present
+- **Complexity hotspots** - `lizard` flags functions with cyclomatic complexity >= 15
+- **Duplication detection** - `jscpd` reports duplicated code blocks across the repo
+- **Performance signals** - each scanner stage is timed; the embed surfaces total scan time plus the 3 slowest stages
+- **Optional Claude review** - Claude Sonnet reviews the PR diff for logic issues scanners miss; gated on `ANTHROPIC_API_KEY` and skipped silently when the secret is not set
+- **Single Discord embed per run** - severity colouring, per-scanner + per-linter + metrics + performance sections, direct links to the workflow run and pull request
 - **Pull-request heartbeat** - an embed is posted for every PR run, including clean ones, so reviewers can see the bot executed
 - **Silent on clean pushes** - no Discord noise for green `main` commits
-- **Archived raw reports** - each run uploads per-scanner JSON as a workflow artifact with 14-day retention
+- **Archived raw reports** - each run uploads per-scanner JSON (security + quality + metrics) as a workflow artifact with 14-day retention
 
 ---
 
@@ -94,7 +98,7 @@ Every run uploads a `security-reports` artifact containing the raw JSON from eac
 
 ### Overriding defaults
 
-The reusable workflow accepts two optional inputs:
+The reusable workflow accepts three optional inputs:
 
 ```yaml
 jobs:
@@ -104,6 +108,7 @@ jobs:
     with:
       node_version: '22'
       python_version: '3.12'
+      dotnet_version: '10.0.x'
 ```
 
 ---
