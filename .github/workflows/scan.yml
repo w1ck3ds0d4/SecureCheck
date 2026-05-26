@@ -9,6 +9,9 @@ on:
       python_version:
         type: string
         default: '3.11'
+      dotnet_version:
+        type: string
+        default: '10.0.x'
 
 permissions:
   contents: read
@@ -42,6 +45,27 @@ jobs:
         with:
           python-version: ${{ inputs.python_version }}
 
+      - name: Detect stack
+        id: detect
+        run: |
+          set -euo pipefail
+          has_js=false; has_py=false; has_rust=false; has_dotnet=false
+          [ -f package.json ] && has_js=true
+          { [ -f requirements.txt ] || [ -f pyproject.toml ]; } && has_py=true || true
+          [ -f Cargo.toml ] || find . -maxdepth 4 -name Cargo.toml -not -path './.securecheck/*' -not -path './node_modules/*' -not -path './target/*' -print -quit | grep -q . && has_rust=true || true
+          find . -maxdepth 4 \( -name '*.sln' -o -name '*.slnx' -o -name '*.csproj' \) -not -path './.securecheck/*' -print -quit | grep -q . && has_dotnet=true || true
+          eslint_cfg=false
+          if [ "${has_js}" = "true" ]; then
+            for f in .eslintrc .eslintrc.json .eslintrc.js .eslintrc.cjs .eslintrc.yml .eslintrc.yaml eslint.config.js eslint.config.cjs eslint.config.mjs; do
+              [ -f "$f" ] && eslint_cfg=true && break
+            done
+          fi
+          echo "has_js=${has_js}"           | tee -a "$GITHUB_OUTPUT"
+          echo "has_py=${has_py}"           | tee -a "$GITHUB_OUTPUT"
+          echo "has_rust=${has_rust}"       | tee -a "$GITHUB_OUTPUT"
+          echo "has_dotnet=${has_dotnet}"   | tee -a "$GITHUB_OUTPUT"
+          echo "eslint_cfg=${eslint_cfg}"   | tee -a "$GITHUB_OUTPUT"
+
       - name: Install gitleaks
         run: |
           set -euo pipefail
@@ -51,64 +75,209 @@ jobs:
       - name: Run gitleaks
         id: gitleaks
         run: |
+          T0=$(date +%s)
           gitleaks detect --source . --redact --no-banner --report-format json --report-path /tmp/gitleaks.json --exit-code 0 || true
           COUNT=$(jq 'length' /tmp/gitleaks.json 2>/dev/null || echo 0)
-          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "count=${COUNT}"          >> "$GITHUB_OUTPUT"
+          echo "duration=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
           echo "Gitleaks findings: ${COUNT}"
 
       - name: Install and run Semgrep
         id: semgrep
         run: |
+          T0=$(date +%s)
           python -m pip install --quiet semgrep
           semgrep --config=auto --json --output=/tmp/semgrep.json --quiet . || true
           COUNT=$(jq '.results | length' /tmp/semgrep.json 2>/dev/null || echo 0)
-          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "count=${COUNT}"          >> "$GITHUB_OUTPUT"
+          echo "duration=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
           echo "Semgrep findings: ${COUNT}"
 
-      - name: Run Trivy
+      - name: Run Trivy (vuln + misconfig + license)
         uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: fs
           format: json
           output: /tmp/trivy.json
           exit-code: '0'
-          scanners: vuln,misconfig
+          scanners: vuln,misconfig,license
           ignore-unfixed: false
 
-      - name: Count Trivy findings
+      - name: Count Trivy findings (split vuln/misconfig/license)
         id: trivy
         run: |
-          COUNT=$(jq '[.Results[]?.Vulnerabilities // [], .Results[]?.Misconfigurations // [] | length] | add // 0' /tmp/trivy.json 2>/dev/null || echo 0)
-          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
-          echo "Trivy findings: ${COUNT}"
+          T0=$(date +%s)
+          VULN=$(jq '[.Results[]?.Vulnerabilities // [] | length] | add // 0' /tmp/trivy.json 2>/dev/null || echo 0)
+          MISC=$(jq '[.Results[]?.Misconfigurations // [] | length] | add // 0' /tmp/trivy.json 2>/dev/null || echo 0)
+          LIC=$(jq '[.Results[]?.Licenses // [] | length] | add // 0' /tmp/trivy.json 2>/dev/null || echo 0)
+          COUNT=$(( VULN + MISC + LIC ))
+          echo "count=${COUNT}"      >> "$GITHUB_OUTPUT"
+          echo "vuln=${VULN}"        >> "$GITHUB_OUTPUT"
+          echo "misconfig=${MISC}"   >> "$GITHUB_OUTPUT"
+          echo "license=${LIC}"      >> "$GITHUB_OUTPUT"
+          echo "duration=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
+          echo "Trivy findings: total=${COUNT} vuln=${VULN} misconfig=${MISC} license=${LIC}"
+
+      - name: ESLint (JS/TS)
+        id: eslint
+        if: steps.detect.outputs.has_js == 'true' && steps.detect.outputs.eslint_cfg == 'true'
+        continue-on-error: true
+        run: |
+          T0=$(date +%s)
+          set +e
+          if [ -f pnpm-lock.yaml ]; then
+            corepack enable >/dev/null 2>&1 || true
+            npm install -g pnpm@latest >/dev/null 2>&1
+            pnpm install --frozen-lockfile --ignore-scripts >/tmp/eslint-install.log 2>&1
+            pnpm exec eslint . --format json --output-file /tmp/eslint.json
+          elif [ -f yarn.lock ]; then
+            corepack enable >/dev/null 2>&1 || true
+            yarn install --frozen-lockfile --ignore-scripts >/tmp/eslint-install.log 2>&1
+            yarn eslint . --format json --output-file /tmp/eslint.json
+          elif [ -f package-lock.json ]; then
+            npm ci --ignore-scripts >/tmp/eslint-install.log 2>&1
+            npx --no-install eslint . --format json --output-file /tmp/eslint.json
+          else
+            npm install --no-audit --no-fund --ignore-scripts >/tmp/eslint-install.log 2>&1
+            npx eslint . --format json --output-file /tmp/eslint.json
+          fi
+          COUNT=$(jq '[.[].messages | length] | add // 0' /tmp/eslint.json 2>/dev/null || echo 0)
+          echo "count=${COUNT}"          >> "$GITHUB_OUTPUT"
+          echo "duration=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
+          echo "ESLint findings: ${COUNT}"
+
+      - name: ruff (Python)
+        id: ruff
+        if: steps.detect.outputs.has_py == 'true'
+        continue-on-error: true
+        run: |
+          T0=$(date +%s)
+          python -m pip install --quiet ruff
+          # Lint + format check, output combined count
+          ruff check --output-format=json --exit-zero . > /tmp/ruff-check.json 2>/dev/null || echo '[]' > /tmp/ruff-check.json
+          ruff format --check . > /tmp/ruff-format.txt 2>&1 || true
+          CHECK_COUNT=$(jq 'length' /tmp/ruff-check.json 2>/dev/null || echo 0)
+          FORMAT_COUNT=$(grep -cE '^Would reformat:' /tmp/ruff-format.txt || echo 0)
+          COUNT=$(( CHECK_COUNT + FORMAT_COUNT ))
+          echo "count=${COUNT}"          >> "$GITHUB_OUTPUT"
+          echo "duration=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
+          echo "ruff findings: ${COUNT} (lint=${CHECK_COUNT}, format=${FORMAT_COUNT})"
+
+      - name: Set up Rust toolchain
+        if: steps.detect.outputs.has_rust == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt,clippy
+
+      - name: cargo fmt + clippy (Rust)
+        id: rust
+        if: steps.detect.outputs.has_rust == 'true'
+        continue-on-error: true
+        run: |
+          T0=$(date +%s)
+          # Find first Cargo.toml directory for project root
+          CARGO_DIR=$(find . -maxdepth 4 -name Cargo.toml -not -path './.securecheck/*' -not -path './node_modules/*' -not -path './target/*' | head -n 1 | xargs -r dirname)
+          [ -z "${CARGO_DIR}" ] && CARGO_DIR="."
+          cd "${CARGO_DIR}"
+          set +e
+          cargo fmt --all --check > /tmp/cargo-fmt.txt 2>&1
+          FMT_EC=$?
+          cargo clippy --all-targets --message-format json -- -D warnings > /tmp/cargo-clippy.json 2>/dev/null
+          CLIPPY_COUNT=$(jq -s '[.[] | select(.reason=="compiler-message" and .message.level=="warning") | .message.level] | length' /tmp/cargo-clippy.json 2>/dev/null || echo 0)
+          FMT_COUNT=$([ "$FMT_EC" -ne 0 ] && echo 1 || echo 0)
+          COUNT=$(( CLIPPY_COUNT + FMT_COUNT ))
+          echo "count=${COUNT}"          >> "$GITHUB_OUTPUT"
+          echo "duration=$(( $(date +%s) - $T0 ))" >> "$GITHUB_OUTPUT"
+          echo "Rust findings: ${COUNT} (clippy=${CLIPPY_COUNT}, fmt_dirty=${FMT_COUNT})"
+
+      - name: Set up .NET SDK
+        if: steps.detect.outputs.has_dotnet == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.dotnet_version }}
+
+      - name: dotnet format (.NET)
+        id: dotnet
+        if: steps.detect.outputs.has_dotnet == 'true'
+        continue-on-error: true
+        run: |
+          T0=$(date +%s)
+          set +e
+          SLN=$(find . -maxdepth 4 \( -name '*.slnx' -o -name '*.sln' \) -not -path './.securecheck/*' | head -n 1)
+          if [ -z "${SLN}" ]; then
+            # Fall back to first csproj
+            SLN=$(find . -maxdepth 4 -name '*.csproj' -not -path './.securecheck/*' | head -n 1)
+          fi
+          dotnet format "${SLN}" --verify-no-changes --report /tmp/dotnet-format.json --severity error > /tmp/dotnet-format.log 2>&1
+          EC=$?
+          if [ -f /tmp/dotnet-format.json ]; then
+            COUNT=$(jq '[.[] | .FileChanges // [] | length] | add // 0' /tmp/dotnet-format.json 2>/dev/null || echo 0)
+          else
+            COUNT=$([ "$EC" -ne 0 ] && echo 1 || echo 0)
+          fi
+          echo "count=${COUNT}"          >> "$GITHUB_OUTPUT"
+          echo "duration=$(( $(date +%s) - $T0 ))" >> "$GITHUB_OUTPUT"
+          echo "dotnet format findings: ${COUNT}"
+
+      - name: Complexity (lizard)
+        id: lizard
+        continue-on-error: true
+        run: |
+          T0=$(date +%s)
+          python -m pip install --quiet lizard
+          # Functions with cyclomatic complexity >= 15 are flagged
+          lizard -C 15 -w . > /tmp/lizard.txt 2>&1 || true
+          COUNT=$(grep -cE '^[^!]' /tmp/lizard.txt || echo 0)
+          echo "count=${COUNT}"          >> "$GITHUB_OUTPUT"
+          echo "duration=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
+          echo "lizard hotspots (CCN>=15): ${COUNT}"
+
+      - name: Duplication (jscpd)
+        id: jscpd
+        continue-on-error: true
+        run: |
+          T0=$(date +%s)
+          npx --yes jscpd \
+            --silent \
+            --threshold 0 \
+            --min-tokens 70 \
+            --reporters json \
+            --output /tmp/jscpd \
+            --ignore "**/node_modules/**,**/dist/**,**/build/**,**/target/**,**/bin/**,**/obj/**,**/.securecheck/**,**/vendor/**,**/*.lock,**/*.min.*" \
+            . > /tmp/jscpd-stdout.txt 2>&1 || true
+          COUNT=$(jq '.statistics.total.duplicatedLines // 0' /tmp/jscpd/jscpd-report.json 2>/dev/null || echo 0)
+          CLONES=$(jq '.statistics.total.clones // 0' /tmp/jscpd/jscpd-report.json 2>/dev/null || echo 0)
+          echo "count=${CLONES}"         >> "$GITHUB_OUTPUT"
+          echo "duplicated_lines=${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "duration=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
+          echo "jscpd clones: ${CLONES} (duplicated lines: ${COUNT})"
 
       - name: Style check (no em-dashes introduced)
         id: em_dash
         run: |
           set -euo pipefail
-          # Determine diff range: PR base..HEAD, or last push commit
+          T0=$(date +%s)
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             git fetch origin "${{ github.base_ref }}" --depth=1 || true
             BASE_SHA=$(git merge-base "origin/${{ github.base_ref }}" HEAD 2>/dev/null || echo "")
             if [ -z "${BASE_SHA}" ]; then
               echo "Could not compute merge-base; skipping check"
-              echo "count=0" >> "$GITHUB_OUTPUT"
+              echo "count=0"          >> "$GITHUB_OUTPUT"
+              echo "duration=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             RANGE="${BASE_SHA}..HEAD"
           else
-            # On push: compare against parent commit
             if git rev-parse HEAD^ >/dev/null 2>&1; then
               RANGE="HEAD^..HEAD"
             else
-              # Initial commit - no parent to diff against
               echo "Initial commit; skipping check"
-              echo "count=0" >> "$GITHUB_OUTPUT"
+              echo "count=0"          >> "$GITHUB_OUTPUT"
+              echo "duration=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           fi
 
-          # Newly-added em-dashes (U+2014) in changed content, excluding common third-party paths
           MATCHES=$(git diff "${RANGE}" -- \
             ':!*.lock' ':!*.svg' ':!node_modules/**' ':!dist/**' ':!build/**' \
             ':!wwwroot/lib/**' ':!.vendor/**' ':!vendor/**' ':!*.min.js' ':!*.min.css' \
@@ -122,11 +291,13 @@ jobs:
             echo
             echo "--- Sample of offending added lines: ---"
             echo "${MATCHES}" | head -10
-            echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+            echo "count=${COUNT}"      >> "$GITHUB_OUTPUT"
+            echo "duration=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
             exit 1
           fi
           echo "OK: no em-dashes introduced"
-          echo "count=0" >> "$GITHUB_OUTPUT"
+          echo "count=0"               >> "$GITHUB_OUTPUT"
+          echo "duration=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
 
       - name: Claude review (optional)
         id: claude
@@ -135,9 +306,12 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BASE_REF: ${{ github.base_ref }}
         run: |
+          T0=$(date +%s)
           if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
             echo "ANTHROPIC_API_KEY not set; skipping Claude review"
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "enabled=false"       >> "$GITHUB_OUTPUT"
+            echo "count=0"             >> "$GITHUB_OUTPUT"
+            echo "duration=0"          >> "$GITHUB_OUTPUT"
             exit 0
           fi
           cd .securecheck
@@ -145,8 +319,9 @@ jobs:
           cd ..
           node .securecheck/scripts/claude-review.mjs > /tmp/claude.json
           COUNT=$(jq 'length' /tmp/claude.json 2>/dev/null || echo 0)
-          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
-          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "count=${COUNT}"          >> "$GITHUB_OUTPUT"
+          echo "enabled=true"            >> "$GITHUB_OUTPUT"
+          echo "duration=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
           echo "Claude findings: ${COUNT}"
 
       - name: Post to Discord
@@ -154,10 +329,35 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           GITLEAKS_COUNT: ${{ steps.gitleaks.outputs.count }}
+          GITLEAKS_DURATION: ${{ steps.gitleaks.outputs.duration }}
           SEMGREP_COUNT: ${{ steps.semgrep.outputs.count }}
+          SEMGREP_DURATION: ${{ steps.semgrep.outputs.duration }}
           TRIVY_COUNT: ${{ steps.trivy.outputs.count }}
+          TRIVY_VULN: ${{ steps.trivy.outputs.vuln }}
+          TRIVY_MISCONFIG: ${{ steps.trivy.outputs.misconfig }}
+          TRIVY_LICENSE: ${{ steps.trivy.outputs.license }}
+          TRIVY_DURATION: ${{ steps.trivy.outputs.duration }}
+          ESLINT_COUNT: ${{ steps.eslint.outputs.count }}
+          ESLINT_DURATION: ${{ steps.eslint.outputs.duration }}
+          RUFF_COUNT: ${{ steps.ruff.outputs.count }}
+          RUFF_DURATION: ${{ steps.ruff.outputs.duration }}
+          RUST_COUNT: ${{ steps.rust.outputs.count }}
+          RUST_DURATION: ${{ steps.rust.outputs.duration }}
+          DOTNET_COUNT: ${{ steps.dotnet.outputs.count }}
+          DOTNET_DURATION: ${{ steps.dotnet.outputs.duration }}
+          LIZARD_COUNT: ${{ steps.lizard.outputs.count }}
+          LIZARD_DURATION: ${{ steps.lizard.outputs.duration }}
+          JSCPD_COUNT: ${{ steps.jscpd.outputs.count }}
+          JSCPD_DUPLICATED_LINES: ${{ steps.jscpd.outputs.duplicated_lines }}
+          JSCPD_DURATION: ${{ steps.jscpd.outputs.duration }}
           CLAUDE_COUNT: ${{ steps.claude.outputs.count }}
           CLAUDE_ENABLED: ${{ steps.claude.outputs.enabled }}
+          CLAUDE_DURATION: ${{ steps.claude.outputs.duration }}
+          HAS_JS: ${{ steps.detect.outputs.has_js }}
+          HAS_PY: ${{ steps.detect.outputs.has_py }}
+          HAS_RUST: ${{ steps.detect.outputs.has_rust }}
+          HAS_DOTNET: ${{ steps.detect.outputs.has_dotnet }}
+          ESLINT_CFG: ${{ steps.detect.outputs.eslint_cfg }}
           EVENT_NAME: ${{ github.event_name }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
@@ -183,6 +383,15 @@ jobs:
             /tmp/gitleaks.json
             /tmp/semgrep.json
             /tmp/trivy.json
+            /tmp/eslint.json
+            /tmp/ruff-check.json
+            /tmp/ruff-format.txt
+            /tmp/cargo-clippy.json
+            /tmp/cargo-fmt.txt
+            /tmp/dotnet-format.json
+            /tmp/dotnet-format.log
+            /tmp/lizard.txt
+            /tmp/jscpd/jscpd-report.json
             /tmp/claude.json
           if-no-files-found: ignore
           retention-days: 14
