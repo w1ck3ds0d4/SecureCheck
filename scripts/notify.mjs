@@ -2,6 +2,7 @@
 // Posts on every run so each repo's scanner activity is visible in the channel.
 
 import fs from 'node:fs';
+import path from 'node:path';
 
 const env = process.env;
 
@@ -187,7 +188,8 @@ function topDurations(d) {
 function readSevereClaudeFindings() {
   if (env.CLAUDE_ENABLED !== 'true') return [];
   try {
-    const raw = fs.readFileSync('/tmp/claude.json', 'utf8');
+    const reportsDir = env.REPORTS || '/tmp';
+    const raw = fs.readFileSync(path.join(reportsDir, 'claude.json'), 'utf8');
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return [];
     return arr.filter(f => f && (f.severity === 'critical' || f.severity === 'high'));
