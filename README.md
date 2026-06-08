@@ -121,12 +121,24 @@ SecureCheck/
     workflows/
       scan.yml                    Reusable workflow; checkout, scanners, notify, upload
   scripts/
-    notify.mjs                    Builds the Discord embed from scanner counts and posts it
+    embed.mjs                     Pure embed-building logic (counts, colour, fields) - unit-tested
+    embed.test.mjs                node --test suite for embed.mjs
+    notify.mjs                    Thin entry point: reads env + Claude file, builds via embed.mjs, POSTs
     claude-review.mjs             Sends the PR diff to Claude and emits structured findings
   package.json                    @anthropic-ai/sdk dependency for the optional Claude step
   LICENSE                         AGPL v3
   COMMERCIAL.md                   Commercial license terms
 ```
+
+## Tests
+
+The embed-building logic (`scripts/embed.mjs`) is pure and unit-tested - no network, no real workflow run:
+
+```bash
+npm test    # node --test over scripts/**/*.test.mjs
+```
+
+CI runs the same suite on every push and pull request (`.github/workflows/ci.yml`).
 
 ---
 
