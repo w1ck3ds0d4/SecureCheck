@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Scripts used by the SecureCheck reusable security-scan GitHub workflow.",
+  "scripts": {
+    "test": "node --test \"scripts/**/*.test.mjs\""
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0"
   }
