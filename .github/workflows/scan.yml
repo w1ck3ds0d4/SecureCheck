@@ -12,6 +12,17 @@ on:
       dotnet_version:
         type: string
         default: '10.0.x'
+      style_check:
+        description: 'Opt-in house style gate: fail when an em dash (U+2014) is introduced in the change set'
+        type: boolean
+        default: false
+    secrets:
+      DISCORD_WEBHOOK_URL:
+        description: 'Incoming Discord webhook the run summary is posted to. Optional: omit to skip the Discord post.'
+        required: false
+      ANTHROPIC_API_KEY:
+        description: 'Anthropic API key enabling the optional Claude PR review. Optional: omit to skip that step.'
+        required: false
 
 permissions:
   contents: read
@@ -24,24 +35,32 @@ jobs:
       GITLEAKS_VERSION: 8.24.3
     steps:
       - name: Checkout consumer repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
 
+      # Check out SecureCheck at the SAME ref the consumer pinned (github.workflow_ref
+      # is "owner/repo/path@ref" for reusable workflows). Without this, a consumer
+      # pinning @v1.0.0 would get the v1.0.0 workflow but main-branch scripts.
+      - name: Resolve SecureCheck ref
+        id: scref
+        run: echo "ref=${GITHUB_WORKFLOW_REF##*@}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout SecureCheck
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           repository: w1ck3ds0d4/SecureCheck
+          ref: ${{ steps.scref.outputs.ref }}
           path: .securecheck
           fetch-depth: 1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: ${{ inputs.node_version }}
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: ${{ inputs.python_version }}
 
@@ -252,8 +271,12 @@ jobs:
           echo "duration=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
           echo "jscpd clones: ${CLONES} (duplicated lines: ${COUNT})"
 
+      # Opt-in house-style gate (off by default). This is a personal authoring
+      # convention, not a security check, so consumers are never failed by it
+      # unless they explicitly set style_check: true on the caller.
       - name: Style check (no em-dashes introduced)
         id: em_dash
+        if: ${{ inputs.style_check }}
         run: |
           set -euo pipefail
           T0=$(date +%s)
