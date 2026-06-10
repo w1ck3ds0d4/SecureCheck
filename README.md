@@ -47,9 +47,27 @@ permissions:
 
 jobs:
   scan:
-    uses: w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@main
-    secrets: inherit
+    uses: w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@v1
+    secrets:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # optional
 ```
+
+Pin `@v1` for the stable line (or `@main` for latest). The workflow checks out its own scripts at the **same ref you pin**, so a pinned caller is fully reproducible. Mapping the two secrets explicitly (rather than `secrets: inherit`) follows least privilege - only these two are ever passed; both are optional.
+
+### Inputs and secrets
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `node_version` | `20` | Node version for ESLint / jscpd |
+| `python_version` | `3.11` | Python version for ruff |
+| `dotnet_version` | `10.0.x` | .NET SDK for `dotnet format` |
+| `style_check` | `false` | Opt-in house-style gate (fails on an introduced em dash); off by default |
+
+| Secret | Required | Used for |
+| --- | --- | --- |
+| `DISCORD_WEBHOOK_URL` | no | Posting the run summary embed; omit to skip the Discord post |
+| `ANTHROPIC_API_KEY` | no | The optional Claude PR review; omit to skip that step |
 
 ### Configure secrets
 
@@ -103,8 +121,9 @@ The reusable workflow accepts three optional inputs:
 ```yaml
 jobs:
   scan:
-    uses: w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@main
-    secrets: inherit
+    uses: w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@v1
+    secrets:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
     with:
       node_version: '22'
       python_version: '3.12'
