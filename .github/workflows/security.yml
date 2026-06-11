@@ -1,0 +1,18 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    # Dogfood: run SecureCheck's own reusable scan against this repo. This also acts
+    # as the regression guard for the scan workflow itself - if the pull_request
+    # checkout (or anything else in scan.yml) breaks again, this job goes red on the
+    # next PR instead of silently failing only in downstream consumer repos.
+    uses: ./.github/workflows/scan.yml
+    secrets: inherit
