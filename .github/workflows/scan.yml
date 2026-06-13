@@ -44,12 +44,18 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
-      # Check out SecureCheck at the SAME ref the consumer pinned (github.workflow_ref
-      # is "owner/repo/path@ref" for reusable workflows). Without this, a consumer
-      # pinning @v1.0.0 would get the v1.0.0 workflow but main-branch scripts.
+      # Check out the SecureCheck scripts. GITHUB_WORKFLOW_REF is the TOP-LEVEL caller's
+      # ref, not this reusable workflow's - on a consumer pull_request that is
+      # refs/pull/N/merge, a ref that does not exist in the SecureCheck repo, so using it
+      # verbatim fails the checkout. Any refs/* form (pull/heads/tags) falls back to the
+      # default branch; only a bare tag/branch name (e.g. a pinned SecureCheck tag) is
+      # used as-is. Scripts are stable across versions, so main is a safe default.
       - name: Resolve SecureCheck ref
         id: scref
-        run: echo "ref=${GITHUB_WORKFLOW_REF##*@}" >> "$GITHUB_OUTPUT"
+        run: |
+          ref="${GITHUB_WORKFLOW_REF##*@}"
+          case "$ref" in */* | "") ref=main ;; esac
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
       - name: Checkout SecureCheck
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
