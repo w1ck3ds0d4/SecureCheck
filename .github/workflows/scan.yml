@@ -315,7 +315,7 @@ jobs:
           MATCHES=$(git diff "${RANGE}" -- \
             ':!*.lock' ':!*.svg' ':!node_modules/**' ':!dist/**' ':!build/**' \
             ':!wwwroot/lib/**' ':!.vendor/**' ':!vendor/**' ':!*.min.js' ':!*.min.css' \
-            | grep -E '^\+[^+]' | grep -F "—" || true)
+            | grep -E '^\+[^+]' | grep -F " - " || true)
 
           if [ -n "${MATCHES}" ]; then
             COUNT=$(echo "${MATCHES}" | wc -l | tr -d ' ')
