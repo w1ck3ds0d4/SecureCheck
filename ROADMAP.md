@@ -10,8 +10,8 @@ output as artifacts.
 
 ## Current state
 
-Workflow is in production and consumed by DA-Task-Alert, RS3-Companion,
-GlassVault, GlassVault.tools, and others. Gitleaks 8.24.3, Semgrep `auto`,
+Workflow is in production and consumed across several private repositories.
+Gitleaks 8.24.3, Semgrep `auto`,
 Trivy, Claude Sonnet step (gated on `ANTHROPIC_API_KEY`). Discord severity
 coding (green clean / yellow findings / orange many findings / red gitleaks
 hit). Per-scanner JSON artifacts retained 14 days. PR heartbeat posts even

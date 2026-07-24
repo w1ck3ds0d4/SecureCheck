@@ -56,10 +56,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0     # full history for gitleaks + PR diff
-      - uses: w1ck3ds0d4/SecureCheck@main   # pin to a release tag for production
+      - uses: w1ck3ds0d4/SecureCheck@v1   # pin @v1 for the stable line, @main for latest
         with:
           fail-on: high
 ```
+
+Pin `@v1` for the stable line (or `@main` for latest). The action checks out its own scripts at the **same ref you pin**, so a pinned caller is fully reproducible.
 
 Prefer to have the whole job managed for you? Use the reusable workflow instead:
 
@@ -69,12 +71,32 @@ permissions:
   security-events: write
 
 jobs:
-  securecheck:
-    uses: w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@main
+  scan:
+    uses: w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@v1
     with:
       fail-on: high
-    secrets: inherit
+    secrets:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # optional
 ```
+
+Mapping the two secrets explicitly (rather than `secrets: inherit`) follows least privilege - only these two are ever passed; both are optional.
+
+### Inputs and secrets
+
+The reusable workflow accepts these inputs; the composite action's full input list is in [Usage](#usage) below.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `node_version` | `20` | Node version for ESLint / jscpd |
+| `python_version` | `3.11` | Python version for ruff |
+| `dotnet_version` | `10.0.x` | .NET SDK for `dotnet format` |
+| `style_check` | `false` | Opt-in house-style gate (fails on an introduced em dash); off by default |
+
+| Secret | Required | Used for |
+| --- | --- | --- |
+| `DISCORD_WEBHOOK_URL` | no | Posting the run summary embed; omit to skip the Discord post |
+| `ANTHROPIC_API_KEY` | no | The optional Claude PR review; omit to skip that step |
 
 More copy-paste templates live in [`examples/`](examples/).
 
@@ -145,7 +167,19 @@ Every run uploads a `security-reports` artifact containing the raw JSON from eac
 | `anthropic-api-key` | `''` | Enables the Claude review when set. Pass `${{ secrets.ANTHROPIC_API_KEY }}`. |
 | `discord-webhook` | `''` | Enables Discord notifications when set. Pass `${{ secrets.DISCORD_WEBHOOK_URL }}`. |
 
-For the **reusable workflow**, pass the API key and webhook as repository secrets (`ANTHROPIC_API_KEY`, `DISCORD_WEBHOOK_URL`) together with `secrets: inherit`, rather than as `with:` inputs.
+The reusable-workflow inputs use snake_case (e.g. `node_version`), while the composite action above uses kebab-case (e.g. `node-version`). Pass the webhook and API key as mapped secrets rather than `with:` inputs:
+
+```yaml
+jobs:
+  scan:
+    uses: w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@v1
+    secrets:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+    with:
+      node_version: '22'
+      python_version: '3.12'
+      dotnet_version: '10.0.x'
+```
 
 ---
 
@@ -159,15 +193,27 @@ SecureCheck/
       scan.yml                  Reusable workflow wrapper around the action
     dependabot.yml              Keeps action + npm versions current
   scripts/
-    notify.mjs                  Builds the Discord embed from scanner counts and posts it
-    claude-review.mjs           Sends the PR diff to Claude and emits structured findings
-    gate.mjs                    Buckets findings by severity and enforces fail-on
-  examples/                     Copy-paste consumer workflows
-  package.json                  @anthropic-ai/sdk dependency for the optional Claude step
+    embed.mjs                     Pure embed-building logic (counts, colour, fields) - unit-tested
+    embed.test.mjs                node --test suite for embed.mjs
+    notify.mjs                    Thin entry point: reads env + Claude file, builds via embed.mjs, POSTs
+    claude-review.mjs             Sends the PR diff to Claude and emits structured findings
+    gate.mjs                      Buckets findings by severity and enforces fail-on
+  examples/                       Copy-paste consumer workflows
+  package.json                    @anthropic-ai/sdk dependency for the optional Claude step
   CHANGELOG.md
-  LICENSE                       AGPL v3
-  COMMERCIAL.md                 Commercial license terms
+  LICENSE                         AGPL v3
+  COMMERCIAL.md                   Commercial license terms
 ```
+
+## Tests
+
+The embed-building logic (`scripts/embed.mjs`) is pure and unit-tested - no network, no real workflow run:
+
+```bash
+npm test    # node --test over scripts/**/*.test.mjs
+```
+
+CI runs the same suite on every push and pull request (`.github/workflows/ci.yml`).
 
 ---
 
