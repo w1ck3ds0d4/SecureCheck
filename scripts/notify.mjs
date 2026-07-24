@@ -7,6 +7,7 @@
 // call. See scripts/embed.test.mjs.
 
 import fs from 'node:fs';
+import path from 'node:path';
 import { buildPayload, summaryLine } from './embed.mjs';
 
 const env = process.env;
@@ -36,7 +37,8 @@ console.log(`Notified Discord. ${summaryLine(env)}`);
 function readSevereClaudeFindings(e) {
   if (e.CLAUDE_ENABLED !== 'true') return [];
   try {
-    const raw = fs.readFileSync('/tmp/claude.json', 'utf8');
+    const reportsDir = env.REPORTS || '/tmp';
+    const raw = fs.readFileSync(path.join(reportsDir, 'claude.json'), 'utf8');
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return [];
     return arr.filter(f => f && (f.severity === 'critical' || f.severity === 'high'));

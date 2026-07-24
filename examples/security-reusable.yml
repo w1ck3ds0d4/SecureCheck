@@ -1,0 +1,20 @@
+# SecureCheck via the reusable workflow (handles checkout/permissions/concurrency
+# for you). Prefer the composite action (see security.yml) unless you specifically
+# want the whole job managed.
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  securecheck:
+    uses: w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@main   # pin to a tag for production
+    with:
+      fail-on: high
+    secrets: inherit

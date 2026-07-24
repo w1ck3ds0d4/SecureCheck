@@ -1,0 +1,25 @@
+# Minimal SecureCheck setup using the composite action (recommended).
+# Copy to .github/workflows/security.yml in your repo.
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write   # required so findings upload to the Security tab
+
+jobs:
+  securecheck:
+    name: SecureCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # full history for gitleaks + PR diff
+
+      - uses: w1ck3ds0d4/SecureCheck@main   # pin to a release tag for production
+        with:
+          fail-on: high       # block on high/critical; use 'none' to report only
