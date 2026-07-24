@@ -1,0 +1,27 @@
+# SecureCheck with the optional Claude PR review and Discord notifications.
+# Set ANTHROPIC_API_KEY and DISCORD_WEBHOOK_URL as repository secrets first.
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  securecheck:
+    name: SecureCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: w1ck3ds0d4/SecureCheck@main   # pin to a release tag for production
+        with:
+          fail-on: high
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          discord-webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
