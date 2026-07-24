@@ -46,7 +46,7 @@ runs:
         mkdir -p "${RUNNER_TEMP}/securecheck"
 
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: ${{ inputs.node-version }}
 
