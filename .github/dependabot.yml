@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Keep the actions referenced by the workflow and composite action current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+
+  # Keep the Node script dependencies (Anthropic SDK) current.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
