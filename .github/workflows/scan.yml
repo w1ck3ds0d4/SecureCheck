@@ -124,7 +124,7 @@ jobs:
           echo "Semgrep findings: ${COUNT}"
 
       - name: Run Trivy (vuln + misconfig + license)
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
         with:
           scan-type: fs
           format: json
@@ -195,7 +195,7 @@ jobs:
 
       - name: Set up Rust toolchain
         if: steps.detect.outputs.has_rust == 'true'
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
           components: rustfmt,clippy
 
@@ -222,7 +222,7 @@ jobs:
 
       - name: Set up .NET SDK
         if: steps.detect.outputs.has_dotnet == 'true'
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: ${{ inputs.dotnet_version }}
 
@@ -410,7 +410,7 @@ jobs:
 
       - name: Upload raw reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: security-reports
           path: |
