@@ -35,7 +35,7 @@ jobs:
       GITLEAKS_VERSION: 8.24.3
     steps:
       - name: Checkout consumer repo
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # On a pull_request event the default ref is refs/pull/<N>/merge, a ref
           # GitHub does not reliably publish - fetching it fails with "couldn't find
@@ -58,7 +58,7 @@ jobs:
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
       - name: Checkout SecureCheck
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: w1ck3ds0d4/SecureCheck
           ref: ${{ steps.scref.outputs.ref }}
