@@ -2,8 +2,6 @@
 
 GitHub **composite action** (and reusable workflow) that runs a multi-scanner security pipeline on every push and pull request: it uploads results to GitHub code scanning as SARIF, can fail the build on a severity threshold, and optionally posts a severity-coloured summary to Discord and runs an AI review of the PR diff.
 
----
-
 ## Features
 
 - **Usable as a Marketplace action or a reusable workflow** - drop in a single `- uses: w1ck3ds0d4/SecureCheck@v1` step, or call the reusable workflow
@@ -22,8 +20,6 @@ GitHub **composite action** (and reusable workflow) that runs a multi-scanner se
 - **Pull-request heartbeat** - an embed is posted for every PR run, including clean ones, so reviewers can see the bot executed
 - **Silent on clean pushes** - no Discord noise for green `main` commits
 - **Archived raw reports** - each run uploads per-scanner JSON (security + quality + metrics) as a workflow artifact with 14-day retention
-
----
 
 ## Install
 
@@ -116,8 +112,6 @@ Add the Anthropic key to the consumer repo's secrets. The workflow detects the s
 gh secret set ANTHROPIC_API_KEY --repo <owner>/<repo>
 ```
 
----
-
 ## Usage
 
 ### Push to `main`
@@ -181,9 +175,7 @@ jobs:
       dotnet_version: '10.0.x'
 ```
 
----
-
-## Project Structure
+## Project structure
 
 ```
 SecureCheck/
@@ -214,8 +206,6 @@ npm test    # node --test over scripts/**/*.test.mjs
 ```
 
 CI runs the same suite on every push and pull request (`.github/workflows/ci.yml`).
-
----
 
 ## License
 
