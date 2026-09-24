@@ -4,14 +4,24 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     commit-message:
-      prefix: ci
+      prefix: chore
+    groups:
+      github-actions-patch:
+        update-types: [patch]
+      github-actions-updates:
+        update-types: [minor, major]
 
   # Keep the Node script dependencies (Anthropic SDK) current.
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     commit-message:
-      prefix: deps
+      prefix: chore
+    groups:
+      npm-patch:
+        update-types: [patch]
+      npm-updates:
+        update-types: [minor, major]

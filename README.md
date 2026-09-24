@@ -63,6 +63,8 @@ jobs:
 
 Pin `@v1` for the stable line (or `@main` for latest). The action checks out its own scripts at the **same ref you pin**, so a pinned caller is fully reproducible.
 
+SecureCheck being a public repo makes the reusable workflow callable from private repos too, but the scan job's minutes are billed against the caller's own account: public repos run it free, private repos pay their normal metered Linux minutes for it.
+
 Prefer to have the whole job managed for you? Use the reusable workflow instead:
 
 ```yaml
