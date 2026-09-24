@@ -1,93 +1,64 @@
-# SecureCheck v1 Roadmap
+# Roadmap
 
-## What v1 is
+**Status:** release: path to v1.0.0. **Last reviewed:** 2026-09-24.
 
-A reusable GitHub Actions workflow that consumer repos call from their own
-`security.yml`. Runs gitleaks (secrets in history), Semgrep (SAST with
-`auto` ruleset), Trivy (CVE + IaC), and an optional Claude Sonnet code review
-on PRs. Posts a severity-coloured Discord embed and uploads raw scanner
-output as artifacts.
+SecureCheck is a reusable GitHub Actions security pipeline (gitleaks, Semgrep,
+Trivy, optional Claude PR review) that consumer repos call from their own
+`security.yml`. All the scanning and gating logic already runs in production
+across several private repos. "Done" for v1.0.0 means the remaining
+documentation and pinning gates are closed and a tagged, Marketplace-listed
+release exists.
 
-## Current state
+> How this file is used: Claude Project threads build the first unticked item
+> under **Now**, one item per branch and pull request, and tick it in that
+> same PR as `- [x] ... (#PR)`. Daniel owns the order and the lists; threads
+> never add to Now, Next or Later themselves, they propose under **Ideas**.
 
-Workflow is in production and consumed across several private repositories.
-Gitleaks 8.24.3, Semgrep `auto`,
-Trivy, Claude Sonnet step (gated on `ANTHROPIC_API_KEY`). Discord severity
-coding (green clean / yellow findings / orange many findings / red gitleaks
-hit). Per-scanner JSON artifacts retained 14 days. PR heartbeat posts even
-when green. Silent on clean pushes to main.
+## Now (path to v1.0.0)
+- [ ] **Document the input matrix**: every `workflow_call`/action input, its
+  default, and what it does, in README. Done when: README has a table
+  covering every input in `action.yml`.
+- [ ] **Document the secret matrix**: every secret the action expects
+  (`DISCORD_WEBHOOK_URL`, `ANTHROPIC_API_KEY`, `GITHUB_TOKEN` scopes) and
+  whether it is required. Done when: README lists each one with required/optional.
+- [ ] **Consumer install template**: add `examples/security.yml` (minimal) and
+  `examples/security-with-claude.yml` (Claude variant), linked from README.
+  Done when: both files exist under `examples/` and are linked from README.
+- [ ] **Version pinning policy**: document in README/CHANGELOG that consumers
+  pin `@v1` for stable or `@main` for latest, and the `v1.0.0`/`v1.0.1`/`v1.1.0`
+  tag scheme. Done when: the policy is written down and CHANGELOG has an
+  Unreleased section following it.
+- [ ] **Consumer smoke fixture**: a `tests/consumer-fixture/` with intentional
+  leaks/SAST hits/CVEs, run in this repo's own CI. Done when: `ci.yml` runs the
+  action against the fixture and the run is green.
+- [ ] **Tag v1.0.0 and list on Marketplace (Daniel)**: cut the tag, publish a
+  GitHub release, and complete the Marketplace listing. Done when: `v1.0.0` is
+  tagged, a GitHub release exists, and the Marketplace listing is live.
 
-## v1 acceptance criteria
+## Next
+- [ ] **Update consumer repos to pin `@v1.0.0`**: move private consumers off
+  branch/SHA references onto the tag. Done when: at least 5 consumer repos
+  reference `@v1.0.0`.
+- [ ] **Severity threshold gating**: add a "fail PR if critical findings" mode
+  on top of the existing `fail-on` input. Done when: a new input controls this
+  and is documented.
 
-- [x] gitleaks scanner with current pinned version
-- [x] Semgrep `auto` ruleset
-- [x] Trivy CVE + IaC scan
-- [x] Optional Claude Sonnet PR review
-- [x] Discord severity coding
-- [x] Per-scanner JSON artifact upload (14-day retention)
-- [x] PR heartbeat posts on green PRs
-- [x] Silent on clean main pushes
+## Later
+- Additional scanners (osv-scanner, kubesec for k8s manifests)
+- Slack/Teams channel posters alongside Discord
+- Markdown PR comment with findings, alongside the Discord embed
+- Re-run knob to refresh a stale Trivy DB without bumping the workflow version
+
+## Ideas
+(empty to start; threads add proposals here)
+
+## Done
+- [x] gitleaks, Semgrep `auto`, and Trivy CVE/IaC scanning wired into the
+  composite action
+- [x] SARIF upload to GitHub code scanning (`upload-sarif` input)
+- [x] Configurable severity gate (`fail-on` input)
+- [x] Optional Claude Sonnet PR review, gated on `ANTHROPIC_API_KEY`
+- [x] Discord severity-coded embed (green/yellow/orange/red) plus PR heartbeat
+- [x] Per-scanner JSON artifacts retained 14 days
 - [x] Em-dash style check gate
-- [x] Gitleaks fails on intro
-- [ ] Documented input matrix (every input the workflow accepts + default + meaning)
-- [ ] Documented secret matrix (every secret the workflow expects + where it's used)
-- [ ] Consumer install template (`.github/workflows/security.yml` example with placeholders)
-- [ ] Version pinning policy + changelog
-- [ ] Smoke test consumer: a `tests/consumer-fixture` repo or scratch run validating each scanner produces output as expected
-- [ ] Tag `v1.0.0` once the input + secret matrices and consumer template are in tree
-
-## Milestones to v1
-
-### M1. Input + secret matrix (S)
-
-- [ ] Document every `workflow_call` input in README (name, type, default, meaning)
-- [ ] Document every secret expected (`DISCORD_WEBHOOK_URL`, `ANTHROPIC_API_KEY`, `GITHUB_TOKEN` scopes)
-- [ ] Note which inputs / secrets are optional vs required
-
-**Acceptance:** a consumer can wire the workflow without reading the YAML.
-
-### M2. Consumer install template (S)
-
-- [ ] Add `examples/security.yml` showing the minimal caller
-- [ ] Add `examples/security-with-claude.yml` showing the Claude variant
-- [ ] Link both from README
-
-**Acceptance:** copy-paste from `examples/` gets a new consumer to green in 5 minutes.
-
-### M3. Versioning + changelog (S)
-
-- [ ] Add CHANGELOG.md
-- [ ] Document version pinning policy: consumers reference `@v1` for stable, `@main` for latest
-- [ ] Tag policy: `v1.0.0`, `v1.0.1` for patches, `v1.1.0` for additive features, `v2.0.0` for breaking changes
-
-**Acceptance:** consumers know exactly which tag to pin and what they get.
-
-### M4. Smoke fixture (S/M)
-
-- [ ] A `tests/consumer-fixture/` scratch dir with intentional leaks / SAST hits / Trivy CVEs
-- [ ] CI on the SecureCheck repo runs the workflow against the fixture and asserts expected severities
-- [ ] Document how to run it locally with `act` (or note that it requires GitHub Actions)
-
-**Acceptance:** changes to the workflow can't ship without proving all scanners still fire.
-
-### M5. Tag v1.0.0 (S)
-
-- [ ] README polish
-- [ ] Tag `v1.0.0`
-- [ ] Update consumer repos one-by-one to pin `@v1.0.0`
-
-**Acceptance:** at least 5 consumer repos pin the v1.0.0 tag.
-
-## Beyond v1 (post-1.0 polish)
-
-- Additional scanners (e.g., `osv-scanner`, `kubesec` for k8s manifests)
-- Slack / Teams channel posters alongside Discord
-- Markdown PR comment with findings (alongside Discord embed)
-- Severity threshold gating ("fail PR if critical findings")
-- Re-run knob to refresh stale Trivy DB without bumping the workflow version
-
-## Out of scope for v1
-
-- Hosting a SaaS edition (it's a GitHub-native workflow)
-- Replacing any of the underlying scanners (they're best-of-class for the niche)
-- Container image building / publishing (consumer's responsibility)
+- [x] Third-party actions pinned to commit SHAs (2026-06-13)
