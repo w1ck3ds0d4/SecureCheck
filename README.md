@@ -93,6 +93,7 @@ The reusable workflow accepts these inputs; the composite action's full input li
 | --- | --- | --- |
 | `DISCORD_WEBHOOK_URL` | no | Posting the run summary embed; omit to skip the Discord post |
 | `ANTHROPIC_API_KEY` | no | The optional Claude PR review; omit to skip that step |
+| `GITHUB_TOKEN` | automatic | Provided by Actions; the calling job needs `security-events: write` for the SARIF upload |
 
 More copy-paste templates live in [`examples/`](examples/).
 

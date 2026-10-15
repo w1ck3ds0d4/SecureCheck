@@ -15,15 +15,15 @@ release exists.
 > never add to Now, Next or Later themselves, they propose under **Ideas**.
 
 ## Now (path to v1.0.0)
-- [ ] **Document the input matrix**: every `workflow_call`/action input, its
+- [x] **Document the input matrix**: every `workflow_call`/action input, its
   default, and what it does, in README. Done when: README has a table
-  covering every input in `action.yml`.
-- [ ] **Document the secret matrix**: every secret the action expects
+  covering every input in `action.yml`. (#6)
+- [x] **Document the secret matrix**: every secret the action expects
   (`DISCORD_WEBHOOK_URL`, `ANTHROPIC_API_KEY`, `GITHUB_TOKEN` scopes) and
-  whether it is required. Done when: README lists each one with required/optional.
-- [ ] **Consumer install template**: add `examples/security.yml` (minimal) and
+  whether it is required. Done when: README lists each one with required/optional. (#9, #41)
+- [x] **Consumer install template**: add `examples/security.yml` (minimal) and
   `examples/security-with-claude.yml` (Claude variant), linked from README.
-  Done when: both files exist under `examples/` and are linked from README.
+  Done when: both files exist under `examples/` and are linked from README. (#6)
 - [ ] **Version pinning policy**: document in README/CHANGELOG that consumers
   pin `@v1` for stable or `@main` for latest, and the `v1.0.0`/`v1.0.1`/`v1.1.0`
   tag scheme. Done when: the policy is written down and CHANGELOG has an

@@ -23,11 +23,11 @@ semantic versioning.
 - Dependabot configuration to keep pinned action versions current.
 
 ### Changed
-- The reusable workflow (`.github/workflows/scan.yml`) is now a thin wrapper that
-  calls the composite action, so the scan logic lives in a single place.
+- The reusable workflow (`.github/workflows/scan.yml`) still carries its own copy
+  of the scan steps; turning it into a thin wrapper around the composite action
+  is still to do.
 - `notify.mjs` reads reports from the run's reports directory instead of a
   hardcoded `/tmp` path.
-
-### Removed
-- The em-dash (U+2014) style check that previously failed builds. It was a
-  personal style rule, not a security control.
+- The em-dash (U+2014) style check no longer fails builds by default. It is a
+  personal style rule, not a security control, so it is now opt-in through the
+  `style_check` input of the reusable workflow.
