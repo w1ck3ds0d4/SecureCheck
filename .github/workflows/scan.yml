@@ -312,10 +312,12 @@ jobs:
             fi
           fi
 
+          # Match U+2014 by its UTF-8 bytes (printf), so this file never carries the
+          # character itself and the house rule holds here too.
           MATCHES=$(git diff "${RANGE}" -- \
             ':!*.lock' ':!*.svg' ':!node_modules/**' ':!dist/**' ':!build/**' \
             ':!wwwroot/lib/**' ':!.vendor/**' ':!vendor/**' ':!*.min.js' ':!*.min.css' \
-            | grep -E '^\+[^+]' | grep -F " - " || true)
+            | grep -E '^\+[^+]' | grep -F "$(printf '\342\200\224')" || true)
 
           if [ -n "${MATCHES}" ]; then
             COUNT=$(echo "${MATCHES}" | wc -l | tr -d ' ')
