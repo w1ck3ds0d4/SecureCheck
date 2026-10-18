@@ -24,10 +24,10 @@ release exists.
 - [x] **Consumer install template**: add `examples/security.yml` (minimal) and
   `examples/security-with-claude.yml` (Claude variant), linked from README.
   Done when: both files exist under `examples/` and are linked from README. (#6)
-- [ ] **Version pinning policy**: document in README/CHANGELOG that consumers
+- [x] **Version pinning policy**: document in README/CHANGELOG that consumers
   pin `@v1` for stable or `@main` for latest, and the `v1.0.0`/`v1.0.1`/`v1.1.0`
   tag scheme. Done when: the policy is written down and CHANGELOG has an
-  Unreleased section following it.
+  Unreleased section following it. (#43)
 - [ ] **Consumer smoke fixture**: a `tests/consumer-fixture/` with intentional
   leaks/SAST hits/CVEs, run in this repo's own CI. Done when: `ci.yml` runs the
   action against the fixture and the run is green.

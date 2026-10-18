@@ -59,6 +59,8 @@ jobs:
 
 Pin `@v1` for the stable line (or `@main` for latest). The action checks out its own scripts at the **same ref you pin**, so a pinned caller is fully reproducible.
 
+Releases are tagged `vX.Y.Z`: a patch (`v1.0.1`) for fixes, a minor (`v1.1.0`) for new inputs or behaviour that keeps existing callers working, a major for breaking changes. The `v1` tag moves to the newest `v1.x.y`, so `@v1` picks up fixes without breaking you; pin an exact tag such as `@v1.0.0` (or a commit SHA) if nothing should change under you.
+
 Prefer to have the whole job managed for you? Use the reusable workflow instead:
 
 ```yaml
