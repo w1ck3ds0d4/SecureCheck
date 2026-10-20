@@ -49,7 +49,7 @@ jobs:
   securecheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0     # full history for gitleaks + PR diff
       - uses: w1ck3ds0d4/SecureCheck@v1   # pin @v1 for the stable line, @main for latest
