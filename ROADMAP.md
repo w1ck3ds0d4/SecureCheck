@@ -11,7 +11,7 @@ release exists.
 
 > How this file is used: Claude Project threads build the first unticked item
 > under **Now**, one item per branch and pull request, and tick it in that
-> same PR as `- [x] ... (#PR)`. Daniel owns the order and the lists; threads
+> same PR as `- [x] ... (#PR)`. The maintainer owns the order and the lists; threads
 > never add to Now, Next or Later themselves, they propose under **Ideas**.
 
 ## Now (path to v1.0.0)
@@ -31,7 +31,7 @@ release exists.
 - [ ] **Consumer smoke fixture**: a `tests/consumer-fixture/` with intentional
   leaks/SAST hits/CVEs, run in this repo's own CI. Done when: `ci.yml` runs the
   action against the fixture and the run is green.
-- [ ] **Tag v1.0.0 and list on Marketplace (Daniel)**: cut the tag, publish a
+- [ ] **Tag v1.0.0 and list on Marketplace (the maintainer)**: cut the tag, publish a
   GitHub release, and complete the Marketplace listing. Done when: `v1.0.0` is
   tagged, a GitHub release exists, and the Marketplace listing is live.
 
