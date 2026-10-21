@@ -1,6 +1,6 @@
 ---
 name: securecheck-actions-bump
-description: Re-pin a third-party GitHub Action to a commit SHA in SecureCheck's action.yml or scan.yml, the way commit 2ceab58 hardened the rest of them. Use when Daniel says "harden SecureCheck", "bump this action", or after a Dependabot PR touches action.yml or scan.yml and bumps an action by version tag instead of SHA.
+description: Re-pin a third-party GitHub Action to a commit SHA in SecureCheck's action.yml or scan.yml, the way commit 2ceab58 hardened the rest of them. Use when the maintainer says "harden SecureCheck", "bump this action", or after a Dependabot PR touches action.yml or scan.yml and bumps an action by version tag instead of SHA.
 ---
 
 # SecureCheck actions bump
@@ -30,7 +30,7 @@ grep -n "uses:" action.yml .github/workflows/*.yml
 ```
 
 Dependabot bumps these by moving the SHA forward but keeping this same comment style
-(check its PR diff), so this skill mostly matters for an action Daniel or you add by hand
+(check its PR diff), so this skill mostly matters for an action the maintainer or you add by hand
 with a bare version tag (`@v4`, `@main`) instead of a SHA.
 
 ## 2. Resolve the tag to a commit SHA
@@ -72,7 +72,7 @@ of action re-pin) does not reach consumers until a new release moves `v1`** - ed
 file on `main` alone changes nothing for anyone pinned at `@v1`. After merging a
 `scan.yml` change:
 
-1. Tell Daniel the change is merged but not live for `@v1` consumers yet.
+1. Tell the maintainer the change is merged but not live for `@v1` consumers yet.
 2. He cuts a release and force-moves the `v1` tag on GitHub's side himself (the same
    tag-and-release step CRA-Check's RELEASING.md describes for its own `@v1` consumers).
    Claude does not push tags to this repo's release line.
@@ -89,5 +89,5 @@ same release-and-move step covers both.
   the action, re-resolve through `git/tags/<sha>` to get the underlying commit.
 - A version-only comment update without the SHA change (or vice versa) leaves the pin
   wrong. Change both together and confirm with the grep in step 4.
-- Do not tag or move `v1` yourself. That is Daniel's step on GitHub, same as the
+- Do not tag or move `v1` yourself. That is the maintainer's step on GitHub, same as the
   Marketplace publish step in CRA-Check's release process.
