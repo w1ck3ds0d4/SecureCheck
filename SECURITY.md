@@ -66,11 +66,11 @@ A PR can still:
 
 ### What a compromised SecureCheck repo could do
 
-If this repo were compromised and a consumer pinned to `@main` (as the README suggests), the attacker could exfiltrate the two secrets in the consumer's repo by editing the workflow or scripts. This is the standard reusable-workflow trust model. Consumers who care should pin to a specific commit SHA in their `uses:` line.
+If this repo were compromised and a consumer pinned to `@main`, the attacker could exfiltrate the two secrets in the consumer's repo by editing the workflow or scripts. This is the standard reusable-workflow trust model. Consumers who care should pin to a specific commit SHA in their `uses:` line.
 
 ## Known weaknesses
 
-- Third-party actions are pinned to major version (`@v6`) rather than commit SHAs. Tag movement is therefore a possible vector.
+- Third-party actions are pinned to commit SHAs (version kept as a trailing comment), so tag movement is not a vector. Dependabot keeps the pins current.
 - `package.json` declares `@anthropic-ai/sdk` with a caret range and there is no committed `package-lock.json`. The Claude step does an unpinned `npm install` at runtime.
 - The diff fed to Claude is sent verbatim. Diffs can contain accidentally committed secrets. Anthropic's data policy applies; consumers who treat their code as confidential should review that before enabling the optional step.
 - Gitleaks output is redacted, but Semgrep, Trivy, and Claude outputs are not. Anyone with artifact-download access on the consumer repo sees those raw reports.

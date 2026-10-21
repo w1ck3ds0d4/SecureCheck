@@ -51,9 +51,13 @@ permissions:
 
 jobs:
   scan:
-    uses: w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@main
-    secrets: inherit
+    uses: w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@v1
+    secrets:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
+
+Pin `@v1` for the stable line. Mapping the two secrets explicitly (rather than `secrets: inherit`) passes only those two, and both are optional. The README shows the equivalent composite-action form, which is the recommended entry point.
 
 ### 2. Add the Discord webhook secret
 
@@ -78,8 +82,9 @@ The Claude step only runs on pull requests and only when this secret is set. Pus
 ```yaml
 jobs:
   scan:
-    uses: w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@main
-    secrets: inherit
+    uses: w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@v1
+    secrets:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
     with:
       node_version: '22'
       python_version: '3.12'
@@ -104,7 +109,7 @@ The embed is a summary. For full context, open the workflow run in the consumer 
 
 ## When something does not work
 
-- **No Discord message.** Check that `DISCORD_WEBHOOK_URL` is set on the consumer repo (organisation-level secrets also work via `secrets: inherit`). The Post step prints `DISCORD_WEBHOOK_URL not set; skipping notification` when missing.
+- **No Discord message.** Check that `DISCORD_WEBHOOK_URL` is set on the consumer repo (organisation-level secrets also work when mapped as in step 1). The Post step prints `DISCORD_WEBHOOK_URL not set; skipping notification` when missing.
 - **No Claude findings on a PR.** Check that `ANTHROPIC_API_KEY` is set and that the event is actually a pull request. The step is hard-skipped on push.
 - **Workflow failed.** Scanner failures alone do not fail the run; if the run is red, it is the workflow itself (network, install). Open the run logs.
 

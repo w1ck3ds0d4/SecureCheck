@@ -18,7 +18,7 @@ GitHub **composite action** (and reusable workflow) that runs a multi-scanner se
 - **Optional Claude review** - Claude Sonnet reviews the PR diff for logic issues scanners miss; gated on `ANTHROPIC_API_KEY` and skipped silently when the secret is not set
 - **Single Discord embed per run** - severity colouring, per-scanner + per-linter + metrics + performance sections, direct links to the workflow run and pull request
 - **Pull-request heartbeat** - an embed is posted for every PR run, including clean ones, so reviewers can see the bot executed
-- **Silent on clean pushes** - no Discord noise for green `main` commits
+- **Optional Discord summary** - one embed per run when a webhook is set (green on a clean run); no webhook, no message
 - **Archived raw reports** - each run uploads per-scanner JSON (security + quality + metrics) as a workflow artifact with 14-day retention
 
 ## Install
@@ -183,6 +183,8 @@ SecureCheck/
   .github/
     workflows/
       scan.yml                  Reusable workflow wrapper around the action
+      ci.yml                    This repo's own test run (npm test)
+      security.yml              This repo scanning itself with SecureCheck
     dependabot.yml              Keeps action + npm versions current
   scripts/
     embed.mjs                     Pure embed-building logic (counts, colour, fields) - unit-tested
