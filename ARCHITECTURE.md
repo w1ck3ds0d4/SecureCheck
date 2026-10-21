@@ -8,8 +8,8 @@ SecureCheck is a centralised, reusable GitHub Actions workflow that runs a multi
 - Node.js 20 (default, configurable via `node_version` input)
 - Python 3.11 (default, configurable via `python_version` input, used to run Semgrep)
 - Bash + `jq` for finding-count extraction
-- Scanners: `gitleaks` 8.24.3, `semgrep` (`auto` ruleset), `trivy` (via `aquasecurity/trivy-action@0.35.0`)
-- `@anthropic-ai/sdk` v0.37 for the optional Claude PR review (model `claude-sonnet-4-6`)
+- Scanners: `gitleaks` 8.24.3, `semgrep` (`auto` ruleset), `trivy` (via `aquasecurity/trivy-action`, SHA-pinned at 0.36.0)
+- `@anthropic-ai/sdk` `^0.128` for the optional Claude PR review (model `claude-sonnet-4-6`)
 - Discord incoming webhook for notifications
 
 ## Components
@@ -41,7 +41,7 @@ Pull request only. Computes `git diff origin/<base>...HEAD`, truncates to 40 KB,
 
 ## Data flow
 
-1. Consumer repo's caller workflow (`.github/workflows/security.yml`) invokes `w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@main` with `secrets: inherit`.
+1. Consumer repo's caller workflow (`.github/workflows/security.yml`) invokes `w1ck3ds0d4/SecureCheck/.github/workflows/scan.yml@v1` (or the composite action) with the two secrets mapped explicitly.
 2. `scan.yml` checks out the consumer repo (`fetch-depth: 0`) and SecureCheck (`path: .securecheck`).
 3. Sets up Node and Python.
 4. Runs gitleaks, Semgrep, and Trivy. Each scanner writes JSON to `/tmp/<scanner>.json`. Counts are extracted with `jq` and exported as step outputs.
@@ -51,9 +51,8 @@ Pull request only. Computes `git diff origin/<base>...HEAD`, truncates to 40 KB,
 
 ## Notification policy
 
-- Push to default branch: post only if total findings > 0 (silent on green commits).
-- Pull request: always post, including clean runs (the heartbeat behaviour, so reviewers see the bot ran).
-- The conditional logic for "silent on clean push" is implicit: the embed always builds, but the green colour and zero counts make a clean push run a benign notification. (Note: the README describes silent-on-clean-push behaviour; the current `notify.mjs` posts on every run that has a webhook configured. Reconcile in `ROADMAP.md`.)
+- Every run posts one embed when a webhook is configured, pushes and pull requests alike, including clean runs (green colour, zero counts), so reviewers see the bot ran.
+- There is no skip-on-clean logic: the Notify step runs whenever `discord-webhook` is non-empty. With no webhook, nothing is posted.
 
 ## Inputs and secrets
 
@@ -62,7 +61,7 @@ Inputs (workflow_call):
 - `node_version` (default `'20'`)
 - `python_version` (default `'3.11'`)
 
-Secrets (read from consumer repo via `secrets: inherit`):
+Secrets (mapped from the consumer repo by the caller):
 
 - `DISCORD_WEBHOOK_URL` (required for notifications, optional for the workflow itself)
 - `ANTHROPIC_API_KEY` (optional, gates the Claude review step)
