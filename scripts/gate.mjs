@@ -33,15 +33,14 @@ if (gitleaks?.runs) {
 }
 buckets.critical += secrets;
 
-// Semgrep SARIF: map level -> severity.
+// Semgrep SARIF: map level -> severity. A missing level is treated as 'warning';
+// anything outside the table (note, none) counts as low.
+const SARIF_LEVEL_TO_BUCKET = { error: 'high', warning: 'medium' };
 const semgrep = readJson('semgrep.sarif');
 if (semgrep?.runs) {
   for (const run of semgrep.runs) {
     for (const res of run.results ?? []) {
-      const level = res.level ?? 'warning';
-      if (level === 'error') buckets.high++;
-      else if (level === 'warning') buckets.medium++;
-      else buckets.low++;
+      buckets[SARIF_LEVEL_TO_BUCKET[res.level ?? 'warning'] ?? 'low']++;
     }
   }
 }
@@ -63,13 +62,13 @@ if (trivy?.Results) {
 const maxSeverity =
   buckets.critical > 0 ? 4 : buckets.high > 0 ? 3 : buckets.medium > 0 ? 2 : buckets.low > 0 ? 1 : 0;
 const threshold = RANK[failOn] ?? 0;
+const tripped = threshold !== 0 && maxSeverity >= threshold;
 
 const line = `Severity counts -> critical: ${buckets.critical}, high: ${buckets.high}, medium: ${buckets.medium}, low: ${buckets.low}`;
 console.log(line);
 
 // Job summary (best effort).
 if (process.env.GITHUB_STEP_SUMMARY) {
-  const tripped = threshold !== 0 && maxSeverity >= threshold;
   const summary = [
     '## SecureCheck',
     '',
@@ -95,7 +94,7 @@ if (threshold === 0) {
   process.exit(0);
 }
 
-if (maxSeverity >= threshold) {
+if (tripped) {
   console.error(`Gate FAILED: found a finding at or above "${failOn}" severity.`);
   if (secrets > 0) console.error(`  ${secrets} secret(s) detected (always critical).`);
   process.exit(1);
